@@ -144,6 +144,36 @@
     }
     #restartBtn:hover { background: #c8a830; }
 
+    /* ── ジャンケン ── */
+    #janken {
+      display: none; width: 100%; max-width: 400px; text-align: center;
+    }
+    #jk-title {
+      font-size: 1.2rem; color: #e0c97f; font-weight: bold; margin-bottom: 6px;
+    }
+    #jk-round { font-size: 0.85rem; color: #888; margin-bottom: 20px; }
+    #jk-hands { display: flex; justify-content: center; gap: 14px; margin-bottom: 18px; }
+    .jk-btn {
+      background: #1e2a4a; border: 2px solid #444; border-radius: 14px;
+      padding: 18px 16px; font-size: 2rem; cursor: pointer; color: #eee;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      min-width: 88px; transition: border-color 0.2s, background 0.2s;
+      line-height: 1;
+    }
+    .jk-btn span.jk-label { font-size: 0.85rem; color: #aaa; }
+    .jk-btn:hover:not(:disabled) { border-color: #e0c97f; background: #2a3a6a; }
+    .jk-btn:disabled { opacity: 0.35; cursor: default; }
+    .jk-btn.selected { border-color: #4caf50; background: #1a3a2a; }
+    #jk-status { color: #aad4f5; font-size: 1rem; min-height: 24px; margin-bottom: 10px; }
+    #jk-reveal {
+      font-size: 1rem; color: #eee; min-height: 28px;
+      background: #16213e; border-radius: 10px; padding: 10px 16px;
+      display: none;
+    }
+    #jk-reveal.show { display: block; }
+    #jk-reveal .jk-face { font-size: 2.4rem; margin-bottom: 4px; }
+    #jk-reveal .jk-msg  { font-size: 1.2rem; font-weight: bold; }
+
     /* ── 結果モーダル ── */
     #result-overlay {
       display: none;
@@ -206,6 +236,22 @@
     </div>
     <button id="joinBtn">ルームに入る</button>
     <p id="lobbyError" style="color:#f87171; margin-top:10px; min-height:20px; font-size:0.9rem;"></p>
+  </div>
+
+  <!-- ジャンケン画面 -->
+  <div id="janken">
+    <div id="jk-title">ジャンケンで先手を決めよう！</div>
+    <div id="jk-round"></div>
+    <div id="jk-hands">
+      <button class="jk-btn" data-choice="gu">✊<span class="jk-label">グー</span></button>
+      <button class="jk-btn" data-choice="choki">✌️<span class="jk-label">チョキ</span></button>
+      <button class="jk-btn" data-choice="pa">🤚<span class="jk-label">パー</span></button>
+    </div>
+    <div id="jk-status"></div>
+    <div id="jk-reveal">
+      <div class="jk-face" id="jk-face"></div>
+      <div class="jk-msg"  id="jk-msg"></div>
+    </div>
   </div>
 
   <div id="game">

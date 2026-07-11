@@ -2,6 +2,97 @@ const socket = io();
 let myColor = null;
 const STARS = new Set(['2,2','2,5','5,2','5,5']);
 
+// ── ジャンケン ────────────────────────────────────────────────────────────
+const JK_EMOJI  = { gu: '✊', choki: '✌️', pa: '🤚' };
+const JK_LABEL  = { gu: 'グー', choki: 'チョキ', pa: 'パー' };
+let jkRound = 0;
+
+function showJanken() {
+  document.getElementById('lobby').style.display   = 'none';
+  document.getElementById('game').style.display    = 'none';
+  document.getElementById('janken').style.display  = 'block';
+  document.getElementById('jk-reveal').classList.remove('show');
+  document.getElementById('jk-status').textContent = 'グー・チョキ・パーを選んでください';
+  document.getElementById('jk-round').textContent  = jkRound > 1 ? `あいこ ${jkRound - 1} 回目` : '';
+  enableJkBtns();
+}
+
+function enableJkBtns() {
+  document.querySelectorAll('.jk-btn').forEach(b => {
+    b.disabled = false;
+    b.classList.remove('selected');
+  });
+}
+
+function disableJkBtns(chosen) {
+  document.querySelectorAll('.jk-btn').forEach(b => {
+    b.disabled = true;
+    if (b.dataset.choice === chosen) b.classList.add('selected');
+  });
+}
+
+document.querySelectorAll('.jk-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const choice = btn.dataset.choice;
+    disableJkBtns(choice);
+    document.getElementById('jk-status').textContent = '相手の選択を待っています...';
+    socket.emit('jankenChoice', choice);
+  });
+});
+
+socket.on('jankenStart', () => {
+  jkRound = 1;
+  showJanken();
+});
+
+socket.on('opponentChosen', () => {
+  const status = document.getElementById('jk-status');
+  if (!document.querySelector('.jk-btn.selected')) {
+    status.textContent = '相手が選択しました！あなたの番です';
+  } else {
+    status.textContent = '双方選択済み... 結果発表！';
+  }
+});
+
+socket.on('jankenResult', ({ myChoice, oppChoice, result, newColor }) => {
+  const reveal = document.getElementById('jk-reveal');
+  const face   = document.getElementById('jk-face');
+  const msg    = document.getElementById('jk-msg');
+
+  face.textContent = `あなた ${JK_EMOJI[myChoice]}${JK_LABEL[myChoice]}  vs  ${JK_EMOJI[oppChoice]}${JK_LABEL[oppChoice]} 相手`;
+
+  if (result === 'draw') {
+    msg.textContent  = 'あいこ！もう一度...';
+    msg.style.color  = '#e0c97f';
+    document.getElementById('jk-status').textContent = '';
+  } else if (result === 'win') {
+    myColor = 'B';
+    msg.textContent = '勝ち！先手（黒）になります 🎉';
+    msg.style.color = '#4caf50';
+    updateColorBadge('B');
+    document.getElementById('jk-status').textContent = 'もうすぐゲーム開始...';
+  } else {
+    myColor = 'W';
+    msg.textContent = '負け... 後手（白）になります';
+    msg.style.color = '#f87171';
+    updateColorBadge('W');
+    document.getElementById('jk-status').textContent = 'もうすぐゲーム開始...';
+  }
+  reveal.classList.add('show');
+});
+
+socket.on('jankenRetry', () => {
+  jkRound++;
+  setTimeout(showJanken, 400);
+});
+
+function updateColorBadge(color) {
+  const badge = document.getElementById('colorBadge');
+  badge.textContent = color === 'B' ? '● 黒（先手）' : '○ 白（後手）';
+  badge.style.background = color === 'B' ? '#111' : '#eee';
+  badge.style.color      = color === 'B' ? '#eee' : '#111';
+}
+
 // ── タイマー ──────────────────────────────────────────────────────────────
 const TURN_SEC = 15;
 let timerInterval = null;
@@ -63,17 +154,13 @@ function setLobbyError(msg) {
 // ── Socket イベント ───────────────────────────────────────────────────────
 socket.on('assignColor', (color) => {
   myColor = color;
-  document.getElementById('lobby').style.display = 'none';
-  document.getElementById('game').style.display = 'block';
-  const badge = document.getElementById('colorBadge');
-  badge.textContent = color === 'B' ? '● 黒（先手）' : '○ 白（後手）';
-  badge.style.background = color === 'B' ? '#111' : '#eee';
-  badge.style.color = color === 'B' ? '#eee' : '#111';
+  updateColorBadge(color);
 });
 
 socket.on('waiting', () => {
-  document.getElementById('lobby').style.display = 'none';
-  document.getElementById('game').style.display = 'block';
+  document.getElementById('lobby').style.display  = 'none';
+  document.getElementById('janken').style.display = 'none';
+  document.getElementById('game').style.display   = 'block';
   setStatus('相手の接続を待っています...');
   renderBoard(createEmptyBoard(), [], null);
 });
@@ -83,6 +170,8 @@ socket.on('secError', (msg) => setLobbyError(`⚠️ ${msg}`));
 
 socket.on('gameStart', ({ board, currentTurn, validMoves }) => {
   hideResult();
+  document.getElementById('janken').style.display = 'none';
+  document.getElementById('game').style.display   = 'block';
   renderBoard(board, validMoves, null);
   updateScores(board);
   setTurnStatus(currentTurn, validMoves);

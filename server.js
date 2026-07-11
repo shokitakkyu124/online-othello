@@ -108,6 +108,71 @@ function handleTimeout(roomId) {
   }
 }
 
+// ── ジャンケンロジック ────────────────────────────────────────────────────
+const JK_VALID = new Set(['gu', 'choki', 'pa']);
+
+function jankenWinner(c1, c2) {
+  if (c1 === c2) return 'draw';
+  if ((c1==='gu'&&c2==='choki') || (c1==='choki'&&c2==='pa') || (c1==='pa'&&c2==='gu')) return 'p1';
+  return 'p2';
+}
+
+function resolveJanken(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || !room.janken) return;
+
+  const [p1, p2]   = room.players;
+  const c1         = room.janken.choices[p1.id];
+  const c2         = room.janken.choices[p2.id];
+  const result     = jankenWinner(c1, c2);
+  const s1         = io.sockets.sockets.get(p1.id);
+  const s2         = io.sockets.sockets.get(p2.id);
+
+  if (result === 'draw') {
+    if (s1) s1.emit('jankenResult', { myChoice: c1, oppChoice: c2, result: 'draw' });
+    if (s2) s2.emit('jankenResult', { myChoice: c2, oppChoice: c1, result: 'draw' });
+    setTimeout(() => {
+      const r = rooms.get(roomId);
+      if (!r || !r.janken) return;
+      r.janken.choices = {};
+      io.to(roomId).emit('jankenRetry');
+    }, 2500);
+    return;
+  }
+
+  // 勝敗決定 → 色を確定
+  const [winP, loseP] = result === 'p1' ? [p1, p2] : [p2, p1];
+  const [winC, loseC] = result === 'p1' ? [c1, c2] : [c2, c1];
+  const winS  = io.sockets.sockets.get(winP.id);
+  const loseS = io.sockets.sockets.get(loseP.id);
+
+  for (const player of room.players) {
+    const isWinner = player.id === winP.id;
+    player.color = isWinner ? 'B' : 'W';
+    const sock = io.sockets.sockets.get(player.id);
+    if (sock) sock.color = player.color;
+  }
+
+  if (winS)  winS.emit('jankenResult',  { myChoice: winC,  oppChoice: loseC, result: 'win',  newColor: 'B' });
+  if (loseS) loseS.emit('jankenResult', { myChoice: loseC, oppChoice: winC,  result: 'lose', newColor: 'W' });
+
+  // 3秒後にゲーム開始
+  setTimeout(() => {
+    const r = rooms.get(roomId);
+    if (!r) return;
+    r.janken     = null;
+    r.board      = createBoard();
+    r.currentTurn = 'B';
+    r.gameOver   = false;
+    io.to(roomId).emit('gameStart', {
+      board: r.board,
+      currentTurn: r.currentTurn,
+      validMoves: getValidMoves(r.board, 'B'),
+    });
+    startTurnTimer(roomId);
+  }, 3000);
+}
+
 // ── オセロロジック ────────────────────────────────────────────────────────
 function createBoard() {
   const b = Array(8).fill(null).map(() => Array(8).fill(null));
@@ -174,7 +239,7 @@ io.on('connection', (socket) => {
       rooms.set(roomId, {
         board: createBoard(), players: [],
         currentTurn: 'B', gameOver: false,
-        timer: null, turnTimer: null,
+        timer: null, turnTimer: null, janken: null,
       });
     }
     const room = rooms.get(roomId);
@@ -190,15 +255,20 @@ io.on('connection', (socket) => {
     secLog('player_joined', { ip, roomId, color });
 
     if (room.players.length === 2) {
-      io.to(roomId).emit('gameStart', {
-        board: room.board,
-        currentTurn: room.currentTurn,
-        validMoves: getValidMoves(room.board, room.currentTurn),
-      });
-      startTurnTimer(roomId);
+      room.janken = { choices: {} };
+      io.to(roomId).emit('jankenStart');
     } else {
       socket.emit('waiting');
     }
+  });
+
+  socket.on('jankenChoice', (choice) => {
+    if (!JK_VALID.has(choice)) return;
+    const room = rooms.get(socket.roomId);
+    if (!room || !room.janken || room.janken.choices[socket.id]) return;
+    room.janken.choices[socket.id] = choice;
+    socket.to(socket.roomId).emit('opponentChosen');
+    if (Object.keys(room.janken.choices).length === 2) resolveJanken(socket.roomId);
   });
 
   socket.on('makeMove', ({ row, col }) => {
