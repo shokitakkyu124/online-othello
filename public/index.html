@@ -286,7 +286,10 @@
 
     // ── ロビー ──
     document.getElementById('generateBtn').addEventListener('click', () => {
-      const id = Math.random().toString(36).slice(2, 8).toUpperCase();
+      // crypto.getRandomValues でセキュアなランダムID生成
+      const arr = new Uint8Array(4);
+      crypto.getRandomValues(arr);
+      const id = Array.from(arr, b => b.toString(36).padStart(2,'0')).join('').slice(0,8).toUpperCase();
       document.getElementById('roomInput').value = id;
     });
 
@@ -295,9 +298,13 @@
       if (e.key === 'Enter') joinRoom();
     });
 
+    const ROOM_ID_PATTERN = /^[A-Za-z0-9]{1,20}$/;
     function joinRoom() {
       const roomId = document.getElementById('roomInput').value.trim();
-      if (!roomId) return;
+      if (!roomId || !ROOM_ID_PATTERN.test(roomId)) {
+        setStatus('ルームIDは半角英数字20文字以内で入力してください');
+        return;
+      }
       socket.emit('joinRoom', roomId);
     }
 
@@ -349,6 +356,8 @@
     });
 
     socket.on('opponentLeft', () => setStatus('相手が切断しました。'));
+    socket.on('secError', (msg) => setStatus(`⚠️ ${msg}`));
+    socket.on('roomExpired', () => setStatus('部屋が30分経過のため終了しました。再度ルームに入ってください。'));
 
     document.getElementById('restartBtn').addEventListener('click', () => {
       socket.emit('restartGame');
