@@ -7,7 +7,6 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const server = http.createServer(app);
 
-// ── 1. セキュリティヘッダー (Helmet) ──────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -22,7 +21,6 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// ── 2. HTTP レート制限（15 分で最大 120 リクエスト/IP）────────────────────
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 120,
@@ -32,33 +30,31 @@ app.use(rateLimit({
 }));
 
 app.use(express.static('public'));
-
-// ── 3. ヘルスチェックエンドポイント ──────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-// ── 4. Socket.io ─────────────────────────────────────────────────────────
 const io = new Server(server, {
-  maxHttpBufferSize: 1e4,      // ペイロード上限 10KB
+  maxHttpBufferSize: 1e4,
   pingTimeout: 20000,
   pingInterval: 25000,
 });
 
-// ── 定数 ──────────────────────────────────────────────────────────────────
-const MAX_ROOMS             = 500;
-const MAX_SOCKETS_PER_IP    = 4;
-const MOVE_RATE_LIMIT_MS    = 300;   // 連続手の最小間隔
-const ROOM_EXPIRE_MS        = 30 * 60 * 1000;  // 30 分で部屋を自動削除
-const ROOM_ID_REGEX         = /^\d{4}$/;
+const MAX_ROOMS          = 500;
+const MAX_SOCKETS_PER_IP = 4;
+const MOVE_RATE_MS       = 300;
+const MSG_RATE_MS        = 2000;
+const MAX_MSG_LEN        = 60;
+const ROOM_EXPIRE_MS     = 30 * 60 * 1000;
+const TURN_TIME_MS       = 15000;
+const ROOM_ID_REGEX      = /^\d{4}$/;
 
-const rooms         = new Map();   // roomId -> room
-const ipConnections = new Map();   // ip -> Set<socketId>
+const rooms         = new Map();
+const ipConnections = new Map();
 
-// ── セキュリティログ ──────────────────────────────────────────────────────
 function secLog(event, data = {}) {
   console.log(JSON.stringify({ ts: new Date().toISOString(), event, ...data }));
 }
 
-// ── 部屋の自動削除タイマー ────────────────────────────────────────────────
+// ── 部屋期限タイマー ──────────────────────────────────────────────────────
 function resetRoomTimer(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
@@ -72,6 +68,46 @@ function resetRoomTimer(roomId) {
   }, ROOM_EXPIRE_MS);
 }
 
+// ── 手番タイムアウト ──────────────────────────────────────────────────────
+function startTurnTimer(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || room.gameOver) return;
+  clearTimeout(room.turnTimer);
+  room.turnTimer = setTimeout(() => handleTimeout(roomId), TURN_TIME_MS);
+}
+
+function handleTimeout(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || room.gameOver) return;
+
+  const timedOut = room.currentTurn;
+  const next     = timedOut === 'B' ? 'W' : 'B';
+  const nextMoves = getValidMoves(room.board, next);
+  const selfMoves = getValidMoves(room.board, timedOut);
+
+  secLog('turn_timeout', { roomId, timedOut });
+
+  if (nextMoves.length > 0) {
+    room.currentTurn = next;
+    io.to(roomId).emit('boardUpdate', {
+      board: room.board, currentTurn: room.currentTurn,
+      validMoves: nextMoves, lastMove: null, timedOut,
+    });
+    startTurnTimer(roomId);
+  } else if (selfMoves.length > 0) {
+    io.to(roomId).emit('boardUpdate', {
+      board: room.board, currentTurn: room.currentTurn,
+      validMoves: selfMoves, lastMove: null, timedOut, skipped: next,
+    });
+    startTurnTimer(roomId);
+  } else {
+    room.gameOver = true;
+    const counts = countPieces(room.board);
+    const winner = counts.B > counts.W ? 'B' : counts.W > counts.B ? 'W' : null;
+    io.to(roomId).emit('gameOver', { board: room.board, counts, winner, lastMove: null });
+  }
+}
+
 // ── オセロロジック ────────────────────────────────────────────────────────
 function createBoard() {
   const b = Array(8).fill(null).map(() => Array(8).fill(null));
@@ -82,11 +118,11 @@ function createBoard() {
 const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
 
 function getFlips(board, row, col, color) {
-  const opp = color==='B' ? 'W' : 'B';
+  const opp = color === 'B' ? 'W' : 'B';
   const flips = [];
-  for (const [dr,dc] of DIRS) {
+  for (const [dr, dc] of DIRS) {
     const line = [];
-    let r=row+dr, c=col+dc;
+    let r = row+dr, c = col+dc;
     while (r>=0&&r<8&&c>=0&&c<8&&board[r][c]===opp) { line.push([r,c]); r+=dr; c+=dc; }
     if (line.length>0&&r>=0&&r<8&&c>=0&&c<8&&board[r][c]===color) flips.push(...line);
   }
@@ -94,25 +130,23 @@ function getFlips(board, row, col, color) {
 }
 
 function getValidMoves(board, color) {
-  const moves=[];
+  const moves = [];
   for (let r=0;r<8;r++) for (let c=0;c<8;c++)
-    if (!board[r][c]&&getFlips(board,r,c,color).length>0) moves.push([r,c]);
+    if (!board[r][c] && getFlips(board,r,c,color).length>0) moves.push([r,c]);
   return moves;
 }
 
 function countPieces(board) {
-  let B=0,W=0;
+  let B=0, W=0;
   for (const row of board) for (const cell of row) { if(cell==='B')B++; if(cell==='W')W++; }
-  return {B,W};
+  return { B, W };
 }
 
-// ── Socket.io 接続処理 ────────────────────────────────────────────────────
+// ── Socket.io ────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-  // 実 IP 取得（Render はリバースプロキシ経由）
   const ip = (socket.handshake.headers['x-forwarded-for'] ?? '')
     .split(',')[0].trim() || socket.handshake.address;
 
-  // 5. IP あたりの接続数制限
   if (!ipConnections.has(ip)) ipConnections.set(ip, new Set());
   const ipSet = ipConnections.get(ip);
   if (ipSet.size >= MAX_SOCKETS_PER_IP) {
@@ -124,30 +158,25 @@ io.on('connection', (socket) => {
   ipSet.add(socket.id);
 
   let lastMoveAt = 0;
+  let lastMsgAt  = 0;
 
-  // ── joinRoom ──
   socket.on('joinRoom', (roomId) => {
-    // 6. ルームID バリデーション
     if (typeof roomId !== 'string' || !ROOM_ID_REGEX.test(roomId)) {
       secLog('invalid_room_id', { ip, input: String(roomId).slice(0,40) });
       socket.emit('secError', 'Invalid room ID.');
       return;
     }
-
     if (!rooms.has(roomId)) {
       if (rooms.size >= MAX_ROOMS) {
         socket.emit('secError', 'Server is at capacity. Try again later.');
         return;
       }
       rooms.set(roomId, {
-        board: createBoard(),
-        players: [],
-        currentTurn: 'B',
-        gameOver: false,
-        timer: null,
+        board: createBoard(), players: [],
+        currentTurn: 'B', gameOver: false,
+        timer: null, turnTimer: null,
       });
     }
-
     const room = rooms.get(roomId);
     if (room.players.length >= 2) { socket.emit('roomFull'); return; }
 
@@ -155,9 +184,8 @@ io.on('connection', (socket) => {
     room.players.push({ id: socket.id, color });
     socket.join(roomId);
     socket.roomId = roomId;
-    socket.color = color;
+    socket.color  = color;
     resetRoomTimer(roomId);
-
     socket.emit('assignColor', color);
     secLog('player_joined', { ip, roomId, color });
 
@@ -167,52 +195,37 @@ io.on('connection', (socket) => {
         currentTurn: room.currentTurn,
         validMoves: getValidMoves(room.board, room.currentTurn),
       });
+      startTurnTimer(roomId);
     } else {
       socket.emit('waiting');
     }
   });
 
-  // ── makeMove ──
   socket.on('makeMove', ({ row, col }) => {
-    // 7. 手のレート制限
     const now = Date.now();
-    if (now - lastMoveAt < MOVE_RATE_LIMIT_MS) {
-      secLog('move_rate_limit', { ip, socketId: socket.id });
-      return;
-    }
+    if (now - lastMoveAt < MOVE_RATE_MS) return;
     lastMoveAt = now;
 
-    // 8. 手の入力バリデーション（プロトタイプ汚染対策含む）
     if (!Number.isInteger(row) || !Number.isInteger(col) ||
         row < 0 || row > 7 || col < 0 || col > 7) {
       secLog('invalid_move_input', { ip, row, col });
       return;
     }
-
     const room = rooms.get(socket.roomId);
     if (!room || room.gameOver) return;
-
-    // 9. 手番チェック（サーバー側で強制）
-    if (room.currentTurn !== socket.color) {
-      secLog('wrong_turn', { ip, color: socket.color, turn: room.currentTurn });
-      return;
-    }
-
-    // 10. そのマスが空であることを確認
+    if (room.currentTurn !== socket.color) return;
     if (room.board[row][col] !== null) return;
 
-    // 11. 有効な手であることを確認
     const flips = getFlips(room.board, row, col, socket.color);
-    if (flips.length === 0) {
-      secLog('invalid_move_no_flip', { ip, row, col });
-      return;
-    }
+    if (flips.length === 0) return;
+
+    clearTimeout(room.turnTimer);
 
     room.board[row][col] = socket.color;
     for (const [r,c] of flips) room.board[r][c] = socket.color;
     resetRoomTimer(socket.roomId);
 
-    const next = socket.color==='B' ? 'W' : 'B';
+    const next         = socket.color === 'B' ? 'W' : 'B';
     const nextMoves    = getValidMoves(room.board, next);
     const currentMoves = getValidMoves(room.board, socket.color);
 
@@ -222,11 +235,13 @@ io.on('connection', (socket) => {
         board: room.board, currentTurn: room.currentTurn,
         validMoves: nextMoves, lastMove: { row, col },
       });
+      startTurnTimer(socket.roomId);
     } else if (currentMoves.length > 0) {
       io.to(socket.roomId).emit('boardUpdate', {
         board: room.board, currentTurn: room.currentTurn,
         validMoves: currentMoves, lastMove: { row, col }, skipped: next,
       });
+      startTurnTimer(socket.roomId);
     } else {
       room.gameOver = true;
       const counts = countPieces(room.board);
@@ -237,11 +252,22 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ── restartGame ──
+  socket.on('sendMessage', (text) => {
+    const now = Date.now();
+    if (now - lastMsgAt < MSG_RATE_MS) return;
+    lastMsgAt = now;
+    if (typeof text !== 'string') return;
+    const cleaned = text.trim().slice(0, MAX_MSG_LEN);
+    if (!cleaned) return;
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+    io.to(socket.roomId).emit('message', { color: socket.color, text: cleaned });
+  });
+
   socket.on('restartGame', () => {
     const room = rooms.get(socket.roomId);
-    // 12. 部屋のプレイヤーのみ再スタート可能
     if (!room || !room.players.some(p => p.id === socket.id)) return;
+    clearTimeout(room.turnTimer);
     room.board = createBoard();
     room.currentTurn = 'B';
     room.gameOver = false;
@@ -251,15 +277,15 @@ io.on('connection', (socket) => {
       currentTurn: room.currentTurn,
       validMoves: getValidMoves(room.board, room.currentTurn),
     });
+    startTurnTimer(socket.roomId);
   });
 
-  // ── disconnect ──
   socket.on('disconnect', () => {
     ipSet.delete(socket.id);
     if (ipSet.size === 0) ipConnections.delete(ip);
-
     const room = rooms.get(socket.roomId);
     if (!room) return;
+    clearTimeout(room.turnTimer);
     room.players = room.players.filter(p => p.id !== socket.id);
     io.to(socket.roomId).emit('opponentLeft');
     if (room.players.length === 0) {
@@ -269,7 +295,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── 未処理エラーで落とさない ──────────────────────────────────────────────
 process.on('uncaughtException',  (err) => secLog('uncaught_exception', { msg: err.message }));
 process.on('unhandledRejection', (err) => secLog('unhandled_rejection', { msg: String(err) }));
 

@@ -19,216 +19,128 @@
       padding: 20px;
     }
 
-    h1 {
-      font-size: 2rem;
-      margin-bottom: 24px;
-      color: #e0c97f;
-      letter-spacing: 3px;
-    }
+    h1 { font-size: 2rem; margin-bottom: 24px; color: #e0c97f; letter-spacing: 3px; }
 
     /* ── ロビー ── */
-    #lobby {
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-    }
-    #lobby p {
-      color: #aaa;
-      margin-bottom: 20px;
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
-    .input-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
+    #lobby { width: 100%; max-width: 400px; text-align: center; }
+    #lobby p { color: #aaa; margin-bottom: 20px; font-size: 0.95rem; line-height: 1.6; }
+    .input-row { display: flex; gap: 8px; margin-bottom: 12px; }
     #roomInput {
-      flex: 1;
-      padding: 12px 14px;
-      font-size: 1rem;
-      border: 2px solid #444;
-      border-radius: 8px;
-      background: #16213e;
-      color: #eee;
-      outline: none;
-      letter-spacing: 2px;
+      flex: 1; padding: 12px 14px; font-size: 1.2rem;
+      border: 2px solid #444; border-radius: 8px;
+      background: #16213e; color: #eee; outline: none;
+      letter-spacing: 6px; text-align: center;
     }
     #roomInput:focus { border-color: #e0c97f; }
 
     button {
-      padding: 12px 18px;
-      font-size: 0.95rem;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
+      padding: 12px 18px; font-size: 0.95rem; border: none;
+      border-radius: 8px; cursor: pointer; font-weight: bold;
       transition: background 0.2s, transform 0.1s;
     }
     button:active { transform: scale(0.97); }
-
-    #generateBtn {
-      background: #3a5a8a;
-      color: #eee;
-      white-space: nowrap;
-    }
+    #generateBtn { background: #3a5a8a; color: #eee; white-space: nowrap; }
     #generateBtn:hover { background: #4a7ab0; }
-
-    #joinBtn {
-      background: #e0c97f;
-      color: #1a1a2e;
-      width: 100%;
-      font-size: 1rem;
-    }
+    #joinBtn { background: #e0c97f; color: #1a1a2e; width: 100%; font-size: 1rem; }
     #joinBtn:hover { background: #c8a830; }
 
     /* ── ゲーム画面 ── */
     #game { width: 100%; max-width: 480px; display: none; }
 
     #colorBadge {
-      display: inline-block;
-      padding: 5px 18px;
-      border-radius: 20px;
-      font-weight: bold;
-      margin-bottom: 10px;
-      font-size: 0.9rem;
-      border: 2px solid #888;
+      display: inline-block; padding: 5px 18px; border-radius: 20px;
+      font-weight: bold; margin-bottom: 10px; font-size: 0.9rem; border: 2px solid #888;
     }
-
     #status {
-      text-align: center;
-      margin-bottom: 10px;
-      font-size: 1rem;
-      min-height: 24px;
-      color: #aad4f5;
+      text-align: center; margin-bottom: 8px; font-size: 1rem;
+      min-height: 24px; color: #aad4f5;
     }
 
-    #scores {
-      display: flex;
-      justify-content: center;
-      gap: 40px;
-      margin-bottom: 14px;
-      font-size: 1.1rem;
+    /* ── タイマー ── */
+    #timer-wrap {
+      display: none; align-items: center; gap: 10px; margin-bottom: 10px;
     }
-    .score-box {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    #timer-label { font-size: 0.8rem; color: #aaa; white-space: nowrap; }
+    #timer-bar-bg {
+      flex: 1; height: 10px; background: #333; border-radius: 5px; overflow: hidden;
     }
-    .score-disc {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      border: 2px solid #888;
+    #timer-bar {
+      height: 100%; width: 100%; border-radius: 5px;
+      background: #4caf50;
+      transition: width 1s linear, background 0.5s;
     }
-    .score-disc.black {
-      background: radial-gradient(circle at 35% 35%, #555, #111);
-    }
-    .score-disc.white {
-      background: radial-gradient(circle at 35% 35%, #fff, #ccc);
-    }
-    .score-num {
-      font-size: 1.4rem;
-      font-weight: bold;
-      min-width: 28px;
+    #timer-num {
+      font-size: 1.3rem; font-weight: bold; min-width: 28px;
+      text-align: right; color: #eee;
     }
 
-    /* ── オセロ盤 ── */
-    #board-wrap {
-      display: flex;
-      justify-content: center;
-    }
+    /* ── スコア ── */
+    #scores { display: flex; justify-content: center; gap: 40px; margin-bottom: 12px; }
+    .score-box { display: flex; align-items: center; gap: 10px; }
+    .score-disc { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #888; }
+    .score-disc.black { background: radial-gradient(circle at 35% 35%, #555, #111); }
+    .score-disc.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); }
+    .score-num { font-size: 1.4rem; font-weight: bold; min-width: 28px; }
 
+    /* ── 盤面 ── */
+    #board-wrap { display: flex; justify-content: center; }
     #board {
-      /* 盤自体は 8×8 のセルを囲む外枠 */
       display: inline-block;
-      background: #1a5c2a;
-      border: 6px solid #5a3a10;
-      border-radius: 4px;
+      background: #1a5c2a; border: 6px solid #5a3a10; border-radius: 4px;
       box-shadow: 0 6px 32px rgba(0,0,0,0.6), inset 0 0 12px rgba(0,0,0,0.3);
-      /* gridはJSで生成したdivに任せる */
-      position: relative;
     }
-
-    .board-grid {
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-    }
-
+    .board-grid { display: grid; grid-template-columns: repeat(8, 1fr); }
     .cell {
-      width: 52px;
-      height: 52px;
-      border: 1px solid #147a2c;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      background: #1d6b30;
+      width: 52px; height: 52px; border: 1px solid #147a2c;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; background: #1d6b30;
     }
-
-    /* 4隅の星点 */
     .cell.star::after {
-      content: '';
-      position: absolute;
-      width: 7px;
-      height: 7px;
-      background: #147a2c;
-      border-radius: 50%;
-      z-index: 0;
+      content: ''; position: absolute; width: 7px; height: 7px;
+      background: #147a2c; border-radius: 50%; z-index: 0;
     }
-
-    /* 置ける場所のヒント */
-    .cell.valid {
-      cursor: pointer;
-    }
+    .cell.valid { cursor: pointer; }
     .cell.valid:hover { background: #257a3a; }
-    .hint-dot {
-      width: 28%;
-      height: 28%;
-      background: rgba(0, 0, 0, 0.25);
-      border-radius: 50%;
-    }
-
-    /* 直前の手のマーカー */
+    .hint-dot { width: 28%; height: 28%; background: rgba(0,0,0,0.25); border-radius: 50%; }
     .last-marker {
-      position: absolute;
-      width: 30%;
-      height: 30%;
-      background: rgba(255, 220, 50, 0.55);
-      border-radius: 50%;
-      z-index: 2;
-      pointer-events: none;
+      position: absolute; width: 30%; height: 30%;
+      background: rgba(255,220,50,0.55); border-radius: 50%; z-index: 2; pointer-events: none;
     }
-
-    /* 石 */
     .disc {
-      width: 82%;
-      height: 82%;
-      border-radius: 50%;
-      position: relative;
-      z-index: 1;
-      animation: placeDisc 0.12s ease-out;
+      width: 82%; height: 82%; border-radius: 50%;
+      position: relative; z-index: 1; animation: placeDisc 0.12s ease-out;
     }
     @keyframes placeDisc {
       from { transform: scale(0.4); opacity: 0.5; }
       to   { transform: scale(1);   opacity: 1; }
     }
-    .disc.black {
-      background: radial-gradient(circle at 35% 30%, #5a5a5a, #111 70%);
-      box-shadow: 2px 3px 6px rgba(0,0,0,0.7);
+    .disc.black { background: radial-gradient(circle at 35% 30%, #5a5a5a, #111 70%); box-shadow: 2px 3px 6px rgba(0,0,0,0.7); }
+    .disc.white { background: radial-gradient(circle at 35% 30%, #ffffff, #cccccc 70%); box-shadow: 2px 3px 6px rgba(0,0,0,0.4); }
+
+    /* ── チャット ── */
+    #chat { margin-top: 14px; }
+    #messages {
+      height: 110px; overflow-y: auto; background: #16213e;
+      border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 0.88rem;
     }
-    .disc.white {
-      background: radial-gradient(circle at 35% 30%, #ffffff, #cccccc 70%);
-      box-shadow: 2px 3px 6px rgba(0,0,0,0.4);
+    .msg { margin-bottom: 5px; line-height: 1.4; word-break: break-all; }
+    .msg .who { font-weight: bold; margin-right: 5px; }
+    .msg.B .who { color: #9dc4e8; }
+    .msg.W .who { color: #d4d4d4; }
+    .msg.sys { color: #888; font-style: italic; }
+    #chat-input-row { display: flex; gap: 8px; }
+    #chatInput {
+      flex: 1; padding: 10px 12px; border: 2px solid #444;
+      border-radius: 8px; background: #16213e; color: #eee;
+      font-size: 0.95rem; outline: none;
     }
+    #chatInput:focus { border-color: #e0c97f; }
+    #sendBtn { background: #3a5a8a; color: #eee; padding: 10px 16px; }
+    #sendBtn:hover { background: #4a7ab0; }
 
     #restartBtn {
-      display: none;
-      margin-top: 16px;
-      background: #e0c97f;
-      color: #1a1a2e;
-      width: 100%;
-      font-size: 1rem;
+      display: none; margin-top: 14px; background: #e0c97f;
+      color: #1a1a2e; width: 100%; font-size: 1rem;
     }
     #restartBtn:hover { background: #c8a830; }
 
@@ -247,7 +159,7 @@
   <div id="lobby">
     <p>ルームIDを共有して相手と同じルームに入ると対戦できます。<br>「発行」ボタンでランダムなIDを生成できます。</p>
     <div class="input-row">
-      <input type="text" id="roomInput" placeholder="数字4桁" maxlength="4" inputmode="numeric" pattern="\d{4}">
+      <input type="text" id="roomInput" placeholder="数字4桁" maxlength="4" inputmode="numeric">
       <button id="generateBtn">発行</button>
     </div>
     <button id="joinBtn">ルームに入る</button>
@@ -259,6 +171,13 @@
       <div id="colorBadge"></div>
     </div>
     <div id="status"></div>
+
+    <div id="timer-wrap">
+      <span id="timer-label">残り</span>
+      <div id="timer-bar-bg"><div id="timer-bar"></div></div>
+      <span id="timer-num">15</span>
+    </div>
+
     <div id="scores">
       <div class="score-box">
         <div class="score-disc black"></div>
@@ -269,11 +188,19 @@
         <span class="score-num" id="scoreW">2</span>
       </div>
     </div>
+
     <div id="board-wrap">
-      <div id="board">
-        <div class="board-grid" id="grid"></div>
+      <div id="board"><div class="board-grid" id="grid"></div></div>
+    </div>
+
+    <div id="chat">
+      <div id="messages"></div>
+      <div id="chat-input-row">
+        <input type="text" id="chatInput" placeholder="コメントを入力..." maxlength="60">
+        <button id="sendBtn">送信</button>
       </div>
     </div>
+
     <button id="restartBtn">もう一度遊ぶ</button>
   </div>
 

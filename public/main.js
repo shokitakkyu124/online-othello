@@ -1,13 +1,41 @@
 const socket = io();
 let myColor = null;
-
 const STARS = new Set(['2,2','2,5','5,2','5,5']);
 
-// ── ロビー ──
+// ── タイマー ──────────────────────────────────────────────────────────────
+const TURN_SEC = 15;
+let timerInterval = null;
+
+function startClientTimer() {
+  clearInterval(timerInterval);
+  let sec = TURN_SEC;
+  updateTimer(sec);
+  document.getElementById('timer-wrap').style.display = 'flex';
+  timerInterval = setInterval(() => {
+    sec--;
+    updateTimer(sec);
+    if (sec <= 0) clearInterval(timerInterval);
+  }, 1000);
+}
+
+function stopClientTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  document.getElementById('timer-wrap').style.display = 'none';
+}
+
+function updateTimer(sec) {
+  const s = Math.max(0, sec);
+  document.getElementById('timer-num').textContent = s;
+  const bar = document.getElementById('timer-bar');
+  bar.style.width = (s / TURN_SEC * 100) + '%';
+  bar.style.background = s > 8 ? '#4caf50' : s > 4 ? '#ff9800' : '#f44336';
+}
+
+// ── ロビー ────────────────────────────────────────────────────────────────
 document.getElementById('generateBtn').addEventListener('click', () => {
   const arr = new Uint32Array(1);
   crypto.getRandomValues(arr);
-  // 1000〜9999 にすることで先頭ゼロなしの確実な4桁を保証
   const id = String(1000 + (arr[0] % 9000));
   document.getElementById('roomInput').value = id;
 });
@@ -32,7 +60,7 @@ function setLobbyError(msg) {
   document.getElementById('lobbyError').textContent = msg;
 }
 
-// ── Socket イベント ──
+// ── Socket イベント ───────────────────────────────────────────────────────
 socket.on('assignColor', (color) => {
   myColor = color;
   document.getElementById('lobby').style.display = 'none';
@@ -58,21 +86,30 @@ socket.on('gameStart', ({ board, currentTurn, validMoves }) => {
   updateScores(board);
   setTurnStatus(currentTurn, validMoves);
   document.getElementById('restartBtn').style.display = 'none';
+  document.getElementById('messages').innerHTML = '';
+  startClientTimer();
 });
 
-socket.on('boardUpdate', ({ board, currentTurn, validMoves, lastMove, skipped }) => {
+socket.on('boardUpdate', ({ board, currentTurn, validMoves, lastMove, skipped, timedOut }) => {
   renderBoard(board, validMoves, lastMove);
   updateScores(board);
-  if (skipped) {
+  startClientTimer();
+
+  if (timedOut) {
+    const label = timedOut === 'B' ? '黒' : '白';
+    addSysMessage(`${label}が時間切れ — ターン交代`);
+    setTurnStatus(currentTurn, validMoves);
+  } else if (skipped) {
     const label = skipped === 'B' ? '黒' : '白';
     setStatus(`${label}は置く場所がないためスキップ`);
-    setTimeout(() => setTurnStatus(currentTurn, validMoves), 1500);
+    setTimeout(() => setTurnStatus(currentTurn, validMoves), 1200);
   } else {
     setTurnStatus(currentTurn, validMoves);
   }
 });
 
 socket.on('gameOver', ({ board, counts, winner, lastMove }) => {
+  stopClientTimer();
   renderBoard(board, [], lastMove);
   updateScores(board);
   const msg = !winner ? '引き分けです！' : winner === myColor ? 'あなたの勝ちです！' : 'あなたの負けです...';
@@ -80,15 +117,60 @@ socket.on('gameOver', ({ board, counts, winner, lastMove }) => {
   document.getElementById('restartBtn').style.display = 'block';
 });
 
-socket.on('opponentLeft', () => setStatus('相手が切断しました。'));
-socket.on('roomExpired', () => setStatus('部屋が30分経過のため終了しました。再度ルームに入ってください。'));
+socket.on('opponentLeft', () => {
+  stopClientTimer();
+  setStatus('相手が切断しました。');
+});
+socket.on('roomExpired', () => {
+  stopClientTimer();
+  setStatus('部屋が30分経過のため終了しました。再度ルームに入ってください。');
+});
 
 document.getElementById('restartBtn').addEventListener('click', () => {
   socket.emit('restartGame');
   document.getElementById('restartBtn').style.display = 'none';
 });
 
-// ── 描画 ──
+// ── チャット ──────────────────────────────────────────────────────────────
+document.getElementById('sendBtn').addEventListener('click', sendChat);
+document.getElementById('chatInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChat();
+});
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  socket.emit('sendMessage', text);
+  input.value = '';
+}
+
+socket.on('message', ({ color, text }) => {
+  const label = color === 'B' ? '黒' : '白';
+  addMessage(color, `${label}：${text}`);
+});
+
+function addMessage(colorClass, text) {
+  const box = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `msg ${colorClass}`;
+  const who = document.createElement('span');
+  who.className = 'who';
+  div.textContent = text;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function addSysMessage(text) {
+  const box = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg sys';
+  div.textContent = `— ${text} —`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── 描画 ──────────────────────────────────────────────────────────────────
 function renderBoard(board, validMoves, lastMove) {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
@@ -98,15 +180,12 @@ function renderBoard(board, validMoves, lastMove) {
     for (let c = 0; c < 8; c++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
-
       if (STARS.has(`${r},${c}`)) cell.classList.add('star');
-
       if (lastMove && lastMove.row === r && lastMove.col === c) {
         const marker = document.createElement('div');
         marker.className = 'last-marker';
         cell.appendChild(marker);
       }
-
       if (board[r][c]) {
         const disc = document.createElement('div');
         disc.className = `disc ${board[r][c] === 'B' ? 'black' : 'white'}`;
@@ -118,7 +197,6 @@ function renderBoard(board, validMoves, lastMove) {
         cell.appendChild(hint);
         cell.addEventListener('click', () => socket.emit('makeMove', { row: r, col: c }));
       }
-
       grid.appendChild(cell);
     }
   }
