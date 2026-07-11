@@ -7,7 +7,8 @@ const STARS = new Set(['2,2','2,5','5,2','5,5']);
 document.getElementById('generateBtn').addEventListener('click', () => {
   const arr = new Uint32Array(1);
   crypto.getRandomValues(arr);
-  const id = String(arr[0] % 10000).padStart(4, '0');
+  // 1000〜9999 にすることで先頭ゼロなしの確実な4桁を保証
+  const id = String(1000 + (arr[0] % 9000));
   document.getElementById('roomInput').value = id;
 });
 
@@ -20,10 +21,15 @@ const ROOM_ID_PATTERN = /^\d{4}$/;
 function joinRoom() {
   const roomId = document.getElementById('roomInput').value.trim();
   if (!ROOM_ID_PATTERN.test(roomId)) {
-    alert('ルームIDは数字4桁で入力してください');
+    setLobbyError('ルームIDは数字4桁で入力してください');
     return;
   }
+  setLobbyError('');
   socket.emit('joinRoom', roomId);
+}
+
+function setLobbyError(msg) {
+  document.getElementById('lobbyError').textContent = msg;
 }
 
 // ── Socket イベント ──
@@ -44,7 +50,8 @@ socket.on('waiting', () => {
   renderBoard(createEmptyBoard(), [], null);
 });
 
-socket.on('roomFull', () => alert('そのルームは満員です。別のルームIDを試してください。'));
+socket.on('roomFull', () => setLobbyError('そのルームは満員です。別のルームIDを試してください。'));
+socket.on('secError', (msg) => setLobbyError(`⚠️ ${msg}`));
 
 socket.on('gameStart', ({ board, currentTurn, validMoves }) => {
   renderBoard(board, validMoves, null);
@@ -74,7 +81,6 @@ socket.on('gameOver', ({ board, counts, winner, lastMove }) => {
 });
 
 socket.on('opponentLeft', () => setStatus('相手が切断しました。'));
-socket.on('secError', (msg) => setStatus(`⚠️ ${msg}`));
 socket.on('roomExpired', () => setStatus('部屋が30分経過のため終了しました。再度ルームに入ってください。'));
 
 document.getElementById('restartBtn').addEventListener('click', () => {
