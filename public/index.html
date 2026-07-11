@@ -6,6 +6,7 @@
   <title>オンラインオセロ</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
       font-family: 'Segoe UI', sans-serif;
       background: #1a1a2e;
@@ -17,121 +18,208 @@
       justify-content: center;
       padding: 20px;
     }
-    h1 { font-size: 2rem; margin-bottom: 20px; color: #e0c97f; letter-spacing: 2px; }
 
-    #lobby, #game { width: 100%; max-width: 480px; }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 24px;
+      color: #e0c97f;
+      letter-spacing: 3px;
+    }
 
-    #lobby { text-align: center; }
-    #lobby input {
+    /* ── ロビー ── */
+    #lobby {
       width: 100%;
-      padding: 12px 16px;
+      max-width: 400px;
+      text-align: center;
+    }
+    #lobby p {
+      color: #aaa;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    #roomInput {
+      flex: 1;
+      padding: 12px 14px;
       font-size: 1rem;
       border: 2px solid #444;
       border-radius: 8px;
       background: #16213e;
       color: #eee;
-      margin-bottom: 12px;
       outline: none;
+      letter-spacing: 2px;
     }
-    #lobby input:focus { border-color: #e0c97f; }
+    #roomInput:focus { border-color: #e0c97f; }
+
     button {
-      padding: 12px 28px;
-      font-size: 1rem;
+      padding: 12px 18px;
+      font-size: 0.95rem;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background 0.2s;
+      font-weight: bold;
+      transition: background 0.2s, transform 0.1s;
     }
-    #joinBtn { background: #e0c97f; color: #1a1a2e; font-weight: bold; width: 100%; }
+    button:active { transform: scale(0.97); }
+
+    #generateBtn {
+      background: #3a5a8a;
+      color: #eee;
+      white-space: nowrap;
+    }
+    #generateBtn:hover { background: #4a7ab0; }
+
+    #joinBtn {
+      background: #e0c97f;
+      color: #1a1a2e;
+      width: 100%;
+      font-size: 1rem;
+    }
     #joinBtn:hover { background: #c8a830; }
+
+    /* ── ゲーム画面 ── */
+    #game { width: 100%; max-width: 480px; display: none; }
+
+    #colorBadge {
+      display: inline-block;
+      padding: 5px 18px;
+      border-radius: 20px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+      border: 2px solid #888;
+    }
 
     #status {
       text-align: center;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       font-size: 1rem;
       min-height: 24px;
       color: #aad4f5;
     }
-    #colorBadge {
-      display: inline-block;
-      padding: 4px 14px;
-      border-radius: 20px;
-      font-weight: bold;
-      margin-bottom: 8px;
-      font-size: 0.9rem;
-    }
+
     #scores {
       display: flex;
-      justify-content: space-around;
-      margin-bottom: 12px;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 14px;
       font-size: 1.1rem;
     }
     .score-box {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
-    .disc-icon {
-      width: 22px; height: 22px;
+    .score-disc {
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
       border: 2px solid #888;
     }
-    .disc-icon.black { background: #111; }
-    .disc-icon.white { background: #f5f5f5; }
+    .score-disc.black {
+      background: radial-gradient(circle at 35% 35%, #555, #111);
+    }
+    .score-disc.white {
+      background: radial-gradient(circle at 35% 35%, #fff, #ccc);
+    }
+    .score-num {
+      font-size: 1.4rem;
+      font-weight: bold;
+      min-width: 28px;
+    }
 
-    #board-container {
+    /* ── オセロ盤 ── */
+    #board-wrap {
       display: flex;
       justify-content: center;
     }
+
     #board {
+      /* 盤自体は 8×8 のセルを囲む外枠 */
+      display: inline-block;
+      background: #1a5c2a;
+      border: 6px solid #5a3a10;
+      border-radius: 4px;
+      box-shadow: 0 6px 32px rgba(0,0,0,0.6), inset 0 0 12px rgba(0,0,0,0.3);
+      /* gridはJSで生成したdivに任せる */
+      position: relative;
+    }
+
+    .board-grid {
       display: grid;
       grid-template-columns: repeat(8, 1fr);
-      gap: 3px;
-      background: #2d6a4f;
-      padding: 8px;
-      border-radius: 10px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-      width: 100%;
-      max-width: 420px;
     }
+
     .cell {
-      aspect-ratio: 1;
-      background: #2d6a4f;
-      border-radius: 4px;
+      width: 52px;
+      height: 52px;
+      border: 1px solid #147a2c;
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: default;
       position: relative;
+      background: #1d6b30;
     }
+
+    /* 4隅の星点 */
+    .cell.star::after {
+      content: '';
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      background: #147a2c;
+      border-radius: 50%;
+      z-index: 0;
+    }
+
+    /* 置ける場所のヒント */
     .cell.valid {
       cursor: pointer;
-      background: #3a8a64;
     }
-    .cell.valid::after {
-      content: '';
+    .cell.valid:hover { background: #257a3a; }
+    .hint-dot {
       width: 28%;
       height: 28%;
-      background: rgba(255,255,255,0.25);
+      background: rgba(0, 0, 0, 0.25);
       border-radius: 50%;
     }
-    .cell.valid:hover { background: #4aaa7a; }
-    .disc {
-      width: 80%;
-      height: 80%;
-      border-radius: 50%;
-      transition: transform 0.15s;
-    }
-    .disc.black { background: radial-gradient(circle at 35% 35%, #555, #111); border: 2px solid #333; }
-    .disc.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); border: 2px solid #aaa; }
-    .cell.last-move::before {
-      content: '';
+
+    /* 直前の手のマーカー */
+    .last-marker {
       position: absolute;
       width: 30%;
       height: 30%;
+      background: rgba(255, 220, 50, 0.55);
       border-radius: 50%;
-      background: rgba(255, 220, 50, 0.6);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* 石 */
+    .disc {
+      width: 82%;
+      height: 82%;
+      border-radius: 50%;
+      position: relative;
       z-index: 1;
+      animation: placeDisc 0.12s ease-out;
+    }
+    @keyframes placeDisc {
+      from { transform: scale(0.4); opacity: 0.5; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .disc.black {
+      background: radial-gradient(circle at 35% 30%, #5a5a5a, #111 70%);
+      box-shadow: 2px 3px 6px rgba(0,0,0,0.7);
+    }
+    .disc.white {
+      background: radial-gradient(circle at 35% 30%, #ffffff, #cccccc 70%);
+      box-shadow: 2px 3px 6px rgba(0,0,0,0.4);
     }
 
     #restartBtn {
@@ -139,13 +227,17 @@
       margin-top: 16px;
       background: #e0c97f;
       color: #1a1a2e;
-      font-weight: bold;
       width: 100%;
+      font-size: 1rem;
     }
     #restartBtn:hover { background: #c8a830; }
 
     @media (max-width: 480px) {
       h1 { font-size: 1.4rem; }
+      .cell { width: 40px; height: 40px; }
+    }
+    @media (max-width: 360px) {
+      .cell { width: 34px; height: 34px; }
     }
   </style>
 </head>
@@ -153,19 +245,34 @@
   <h1>オンラインオセロ</h1>
 
   <div id="lobby">
-    <p style="margin-bottom:16px; color:#aaa;">ルームIDを入力して相手と同じルームに入ると対戦できます</p>
-    <input type="text" id="roomInput" placeholder="ルームID（例: room1）" maxlength="20">
+    <p>ルームIDを共有して相手と同じルームに入ると対戦できます。<br>「発行」ボタンでランダムなIDを生成できます。</p>
+    <div class="input-row">
+      <input type="text" id="roomInput" placeholder="ルームID" maxlength="20">
+      <button id="generateBtn">発行</button>
+    </div>
     <button id="joinBtn">ルームに入る</button>
   </div>
 
-  <div id="game" style="display:none;">
-    <div id="colorBadge"></div>
+  <div id="game">
+    <div style="text-align:center; margin-bottom:10px;">
+      <div id="colorBadge"></div>
+    </div>
     <div id="status"></div>
     <div id="scores">
-      <div class="score-box"><div class="disc-icon black"></div><span id="scoreB">2</span></div>
-      <div class="score-box"><div class="disc-icon white"></div><span id="scoreW">2</span></div>
+      <div class="score-box">
+        <div class="score-disc black"></div>
+        <span class="score-num" id="scoreB">2</span>
+      </div>
+      <div class="score-box">
+        <div class="score-disc white"></div>
+        <span class="score-num" id="scoreW">2</span>
+      </div>
     </div>
-    <div id="board-container"><div id="board"></div></div>
+    <div id="board-wrap">
+      <div id="board">
+        <div class="board-grid" id="grid"></div>
+      </div>
+    </div>
     <button id="restartBtn">もう一度遊ぶ</button>
   </div>
 
@@ -173,126 +280,136 @@
   <script>
     const socket = io();
     let myColor = null;
-    let currentBoard = null;
-    let validMoves = [];
-    let lastMove = null;
 
-    document.getElementById('joinBtn').addEventListener('click', () => {
+    // 星点の位置
+    const STARS = new Set(['2,2','2,5','5,2','5,5']);
+
+    // ── ロビー ──
+    document.getElementById('generateBtn').addEventListener('click', () => {
+      const id = Math.random().toString(36).slice(2, 8).toUpperCase();
+      document.getElementById('roomInput').value = id;
+    });
+
+    document.getElementById('joinBtn').addEventListener('click', joinRoom);
+    document.getElementById('roomInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') joinRoom();
+    });
+
+    function joinRoom() {
       const roomId = document.getElementById('roomInput').value.trim();
       if (!roomId) return;
       socket.emit('joinRoom', roomId);
-    });
-    document.getElementById('roomInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('joinBtn').click();
-    });
+    }
 
+    // ── Socket イベント ──
     socket.on('assignColor', (color) => {
       myColor = color;
       document.getElementById('lobby').style.display = 'none';
       document.getElementById('game').style.display = 'block';
       const badge = document.getElementById('colorBadge');
-      badge.textContent = color === 'B' ? '黒（先手）' : '白（後手）';
-      badge.style.background = color === 'B' ? '#222' : '#eee';
-      badge.style.color = color === 'B' ? '#eee' : '#222';
-      badge.style.border = '2px solid #888';
+      badge.textContent = color === 'B' ? '● 黒（先手）' : '○ 白（後手）';
+      badge.style.background = color === 'B' ? '#111' : '#eee';
+      badge.style.color = color === 'B' ? '#eee' : '#111';
     });
 
     socket.on('waiting', () => {
       document.getElementById('lobby').style.display = 'none';
       document.getElementById('game').style.display = 'block';
       setStatus('相手の接続を待っています...');
+      renderBoard(createEmptyBoard(), [], null);
     });
 
     socket.on('roomFull', () => alert('そのルームは満員です。別のルームIDを試してください。'));
 
-    socket.on('gameStart', ({ board, currentTurn, validMoves: vm }) => {
-      lastMove = null;
-      validMoves = vm;
-      renderBoard(board, vm, null);
+    socket.on('gameStart', ({ board, currentTurn, validMoves }) => {
+      renderBoard(board, validMoves, null);
       updateScores(board);
-      setTurnStatus(currentTurn, vm);
+      setTurnStatus(currentTurn, validMoves);
       document.getElementById('restartBtn').style.display = 'none';
     });
 
-    socket.on('boardUpdate', ({ board, currentTurn, validMoves: vm, lastMove: lm, skipped }) => {
-      lastMove = lm;
-      validMoves = vm;
-      renderBoard(board, vm, lm);
+    socket.on('boardUpdate', ({ board, currentTurn, validMoves, lastMove, skipped }) => {
+      renderBoard(board, validMoves, lastMove);
       updateScores(board);
       if (skipped) {
-        const skippedLabel = skipped === 'B' ? '黒' : '白';
-        setStatus(`${skippedLabel}は置く場所がないためスキップ`);
-        setTimeout(() => setTurnStatus(currentTurn, vm), 1500);
+        const label = skipped === 'B' ? '黒' : '白';
+        setStatus(`${label}は置く場所がないためスキップ`);
+        setTimeout(() => setTurnStatus(currentTurn, validMoves), 1500);
       } else {
-        setTurnStatus(currentTurn, vm);
+        setTurnStatus(currentTurn, validMoves);
       }
     });
 
-    socket.on('gameOver', ({ board, counts, winner, lastMove: lm }) => {
-      renderBoard(board, [], lm);
+    socket.on('gameOver', ({ board, counts, winner, lastMove }) => {
+      renderBoard(board, [], lastMove);
       updateScores(board);
-      let msg;
-      if (!winner) msg = '引き分けです！';
-      else if (winner === myColor) msg = 'あなたの勝ちです！';
-      else msg = 'あなたの負けです...';
+      let msg = !winner ? '引き分けです！' : winner === myColor ? 'あなたの勝ちです！' : 'あなたの負けです...';
       setStatus(`ゲーム終了 — ${msg}`);
       document.getElementById('restartBtn').style.display = 'block';
     });
 
-    socket.on('opponentLeft', () => {
-      setStatus('相手が切断しました。ページをリロードして再挑戦してください。');
-    });
+    socket.on('opponentLeft', () => setStatus('相手が切断しました。'));
 
     document.getElementById('restartBtn').addEventListener('click', () => {
       socket.emit('restartGame');
       document.getElementById('restartBtn').style.display = 'none';
     });
 
-    function renderBoard(board, vm, lm) {
-      currentBoard = board;
-      const boardEl = document.getElementById('board');
-      boardEl.innerHTML = '';
-      const validSet = new Set(vm.map(([r,c]) => `${r},${c}`));
+    // ── 描画 ──
+    function renderBoard(board, validMoves, lastMove) {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      const validSet = new Set(validMoves.map(([r,c]) => `${r},${c}`));
+
       for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
           const cell = document.createElement('div');
           cell.className = 'cell';
-          if (lm && lm.row === r && lm.col === c) cell.classList.add('last-move');
+
+          if (STARS.has(`${r},${c}`)) cell.classList.add('star');
+
+          if (lastMove && lastMove.row === r && lastMove.col === c) {
+            const marker = document.createElement('div');
+            marker.className = 'last-marker';
+            cell.appendChild(marker);
+          }
+
           if (board[r][c]) {
             const disc = document.createElement('div');
             disc.className = `disc ${board[r][c] === 'B' ? 'black' : 'white'}`;
             cell.appendChild(disc);
           } else if (validSet.has(`${r},${c}`)) {
             cell.classList.add('valid');
-            cell.addEventListener('click', () => placeDisc(r, c));
+            const hint = document.createElement('div');
+            hint.className = 'hint-dot';
+            cell.appendChild(hint);
+            cell.addEventListener('click', () => socket.emit('makeMove', { row: r, col: c }));
           }
-          boardEl.appendChild(cell);
+
+          grid.appendChild(cell);
         }
       }
     }
 
-    function placeDisc(row, col) {
-      socket.emit('makeMove', { row, col });
+    function createEmptyBoard() {
+      const b = Array(8).fill(null).map(() => Array(8).fill(null));
+      b[3][3]='W'; b[3][4]='B'; b[4][3]='B'; b[4][4]='W';
+      return b;
     }
 
     function updateScores(board) {
       let B = 0, W = 0;
-      for (const row of board) for (const cell of row) { if (cell==='B') B++; if (cell==='W') W++; }
+      for (const row of board) for (const cell of row) { if(cell==='B') B++; if(cell==='W') W++; }
       document.getElementById('scoreB').textContent = B;
       document.getElementById('scoreW').textContent = W;
     }
 
-    function setTurnStatus(currentTurn, vm) {
-      if (currentTurn === myColor) {
-        setStatus(vm.length > 0 ? 'あなたの番です' : 'あなたは置く場所がありません');
-      } else {
-        setStatus('相手の番です...');
-      }
+    function setTurnStatus(turn, moves) {
+      if (turn === myColor) setStatus(moves.length > 0 ? 'あなたの番です' : '置く場所がありません');
+      else setStatus('相手の番です...');
     }
 
-    function setStatus(msg) {
-      document.getElementById('status').textContent = msg;
-    }
+    function setStatus(msg) { document.getElementById('status').textContent = msg; }
   </script>
 </body>
 </html>
