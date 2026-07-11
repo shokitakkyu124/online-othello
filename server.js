@@ -48,7 +48,7 @@ const MAX_ROOMS             = 500;
 const MAX_SOCKETS_PER_IP    = 4;
 const MOVE_RATE_LIMIT_MS    = 300;   // 連続手の最小間隔
 const ROOM_EXPIRE_MS        = 30 * 60 * 1000;  // 30 分で部屋を自動削除
-const ROOM_ID_REGEX         = /^[A-Za-z0-9]{1,20}$/;
+const ROOM_ID_REGEX         = /^\d{4}$/;
 
 const rooms         = new Map();   // roomId -> room
 const ipConnections = new Map();   // ip -> Set<socketId>

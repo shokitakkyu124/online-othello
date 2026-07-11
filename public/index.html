@@ -247,7 +247,7 @@
   <div id="lobby">
     <p>ルームIDを共有して相手と同じルームに入ると対戦できます。<br>「発行」ボタンでランダムなIDを生成できます。</p>
     <div class="input-row">
-      <input type="text" id="roomInput" placeholder="ルームID" maxlength="20">
+      <input type="text" id="roomInput" placeholder="数字4桁" maxlength="4" inputmode="numeric" pattern="\d{4}">
       <button id="generateBtn">発行</button>
     </div>
     <button id="joinBtn">ルームに入る</button>
@@ -287,9 +287,9 @@
     // ── ロビー ──
     document.getElementById('generateBtn').addEventListener('click', () => {
       // crypto.getRandomValues でセキュアなランダムID生成
-      const arr = new Uint8Array(4);
+      const arr = new Uint32Array(1);
       crypto.getRandomValues(arr);
-      const id = Array.from(arr, b => b.toString(36).padStart(2,'0')).join('').slice(0,8).toUpperCase();
+      const id = String(arr[0] % 10000).padStart(4, '0');
       document.getElementById('roomInput').value = id;
     });
 
@@ -298,11 +298,11 @@
       if (e.key === 'Enter') joinRoom();
     });
 
-    const ROOM_ID_PATTERN = /^[A-Za-z0-9]{1,20}$/;
+    const ROOM_ID_PATTERN = /^\d{4}$/;
     function joinRoom() {
       const roomId = document.getElementById('roomInput').value.trim();
-      if (!roomId || !ROOM_ID_PATTERN.test(roomId)) {
-        setStatus('ルームIDは半角英数字20文字以内で入力してください');
+      if (!ROOM_ID_PATTERN.test(roomId)) {
+        setStatus('ルームIDは数字4桁で入力してください');
         return;
       }
       socket.emit('joinRoom', roomId);
