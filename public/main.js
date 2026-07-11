@@ -82,6 +82,7 @@ socket.on('roomFull', () => setLobbyError('そのルームは満員です。別�
 socket.on('secError', (msg) => setLobbyError(`⚠️ ${msg}`));
 
 socket.on('gameStart', ({ board, currentTurn, validMoves }) => {
+  hideResult();
   renderBoard(board, validMoves, null);
   updateScores(board);
   setTurnStatus(currentTurn, validMoves);
@@ -100,9 +101,11 @@ socket.on('boardUpdate', ({ board, currentTurn, validMoves, lastMove, skipped, t
     addSysMessage(`${label}が時間切れ — ターン交代`);
     setTurnStatus(currentTurn, validMoves);
   } else if (skipped) {
-    const label = skipped === 'B' ? '黒' : '白';
-    setStatus(`${label}は置く場所がないためスキップ`);
-    setTimeout(() => setTurnStatus(currentTurn, validMoves), 1200);
+    const passedLabel  = skipped     === 'B' ? '黒' : '白';
+    const activeLabel  = currentTurn === 'B' ? '黒' : '白';
+    showPassToast(`${passedLabel} はパス！\n${activeLabel} の番です`);
+    addSysMessage(`${passedLabel}はパス — ${activeLabel}の番`);
+    setTurnStatus(currentTurn, validMoves);
   } else {
     setTurnStatus(currentTurn, validMoves);
   }
@@ -112,9 +115,8 @@ socket.on('gameOver', ({ board, counts, winner, lastMove }) => {
   stopClientTimer();
   renderBoard(board, [], lastMove);
   updateScores(board);
-  const msg = !winner ? '引き分けです！' : winner === myColor ? 'あなたの勝ちです！' : 'あなたの負けです...';
-  setStatus(`ゲーム終了 — ${msg}`);
-  document.getElementById('restartBtn').style.display = 'block';
+  setStatus('ゲーム終了');
+  showResult(winner, counts);
 });
 
 socket.on('opponentLeft', () => {
@@ -129,6 +131,11 @@ socket.on('roomExpired', () => {
 document.getElementById('restartBtn').addEventListener('click', () => {
   socket.emit('restartGame');
   document.getElementById('restartBtn').style.display = 'none';
+});
+
+document.getElementById('result-close').addEventListener('click', () => {
+  socket.emit('restartGame');
+  hideResult();
 });
 
 // ── チャット ──────────────────────────────────────────────────────────────
@@ -221,3 +228,41 @@ function setTurnStatus(turn, moves) {
 }
 
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+// ── 結果モーダル ──────────────────────────────────────────────────────────
+function showResult(winner, counts) {
+  const overlay = document.getElementById('result-overlay');
+  const icon    = document.getElementById('result-icon');
+  const title   = document.getElementById('result-title');
+  const score   = document.getElementById('result-score');
+
+  if (!winner) {
+    icon.textContent  = '🤝';
+    title.textContent = '引き分け！';
+    title.style.color = '#e0c97f';
+  } else if (winner === myColor) {
+    icon.textContent  = '🏆';
+    title.textContent = '勝利！';
+    title.style.color = '#4caf50';
+  } else {
+    icon.textContent  = '😢';
+    title.textContent = '敗北...';
+    title.style.color = '#f44336';
+  }
+  score.textContent = `黒 ${counts.B} — ${counts.W} 白`;
+  overlay.classList.add('show');
+}
+
+function hideResult() {
+  document.getElementById('result-overlay').classList.remove('show');
+}
+
+// ── パストースト ──────────────────────────────────────────────────────────
+let passToastTimer = null;
+function showPassToast(msg) {
+  const toast = document.getElementById('pass-toast');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  clearTimeout(passToastTimer);
+  passToastTimer = setTimeout(() => { toast.style.display = 'none'; }, 2000);
+}
